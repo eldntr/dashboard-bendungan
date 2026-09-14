@@ -11,10 +11,30 @@ function parseIndoNumber(val: string): number | null {
   return isNaN(num) ? null : num;
 }
 
-export function parseDamReport(text: string): DamMonitoringData {
+/**
+ * Split bulk input text containing multiple dam reports into individual report texts.
+ */
+export function splitMultipleReports(text: string): string[] {
+  // Normalize newline and handle multiple reports glued together
+  // Usually starts with "Bendung ..."
+  const delimiterRegex = /(?=(?:^|\n)\s*Bendung\s+[^\n]+(?:\r?\n\s*=+|\r?\n\s*Tanggal))/gi;
+  const rawChunks = text.split(delimiterRegex).map((c) => c.trim()).filter(Boolean);
+
+  if (rawChunks.length <= 1) {
+    // If regex didn't split (e.g. glued without clear newline before Bendung), try another split
+    const parts = text.split(/(?=Bendung\s+[A-Za-z0-9]+)/g).map((c) => c.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      return parts;
+    }
+  }
+
+  return rawChunks.length > 0 ? rawChunks : [text];
+}
+
+export function parseSingleDamReport(text: string): DamMonitoringData {
   const lines = text.split("\n").map((l) => l.trim());
 
-  let dam_name = "Bendungan";
+  let dam_name = "Bendung Mrican";
   let date_str = "";
   let time_range = "";
   let condition = "Normal";
@@ -29,9 +49,9 @@ export function parseDamReport(text: string): DamMonitoringData {
   let shift_info = "Shift I";
   const officers: string[] = [];
 
-  // Extract dam name from first non-empty line
+  // Extract dam name
   for (const line of lines) {
-    if (line && !line.startsWith("=") && !line.startsWith("_")) {
+    if (line.toLowerCase().startsWith("bendung")) {
       dam_name = line;
       break;
     }
@@ -65,7 +85,7 @@ export function parseDamReport(text: string): DamMonitoringData {
       inHourlySection = true;
       inPetugasSection = false;
     } else if (inHourlySection && /^\d{2}\.\d{2}\s*=/i.test(line)) {
-      // e.g. 07.00 = 29,98 m³/det
+      // e.g. 10.00 = 29,98 m³/det
       const parts = line.split("=");
       const hour = parts[0]?.trim();
       const valStr = parts[1]?.replace(/m³\/det/i, "").trim();
@@ -94,9 +114,15 @@ export function parseDamReport(text: string): DamMonitoringData {
       inPetugasSection = true;
       inHourlySection = false;
     } else if (inPetugasSection && line && !line.startsWith("_") && !line.startsWith("=")) {
-      officers.push(line.trim());
+      // Split glued lines if text contains next dam
+      if (/Bendung\s+/i.test(line)) {
+        const subParts = line.split(/(?=Bendung\s+)/i);
+        if (subParts[0]?.trim()) officers.push(subParts[0].trim());
+        break;
+      } else {
+        officers.push(line.trim());
+      }
     } else if (line.startsWith("___") || line.startsWith("===")) {
-      // divider
       if (inHourlySection) {
         inHourlySection = false;
       }
@@ -109,8 +135,7 @@ export function parseDamReport(text: string): DamMonitoringData {
     out_average = parseFloat((sum / outflow_hourly.length).toFixed(2));
   }
 
-  // Determine Siaga status based on Inflow DKD or Outflow
-  // Siaga Banjir: Hijau >= 800, Kuning >= 900, Merah >= 1000
+  // Determine Siaga status
   const maxQ = Math.max(q_inflow_dkd ?? 0, q_outflow_dkd ?? 0, out_average ?? 0);
   let siaga_status: "Hijau" | "Kuning" | "Merah" | "Normal" = "Normal";
   if (maxQ >= 1000) {
@@ -140,3 +165,14 @@ export function parseDamReport(text: string): DamMonitoringData {
     officers,
   };
 }
+
+export function parseDamReports(text: string): DamMonitoringData[] {
+  const chunks = splitMultipleReports(text);
+  return chunks.map((chunk) => parseSingleDamReport(chunk));
+}
+
+// Backward-compatibility
+export const parseDamReport = (text: string) => {
+  const list = parseDamReports(text);
+  return list[0] || parseSingleDamReport(text);
+};

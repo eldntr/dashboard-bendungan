@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { parseDamReport } from "@/lib/parser";
+import { parseDamReports } from "@/lib/parser";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { DamMonitoringData } from "@/types/dam";
 import {
@@ -54,7 +54,8 @@ Robert T`;
 
 export default function DamDashboard() {
   const [inputText, setInputText] = useState(SAMPLE_TEXT);
-  const [previewData, setPreviewData] = useState<DamMonitoringData | null>(null);
+  const [parsedReports, setParsedReports] = useState<DamMonitoringData[]>([]);
+  const [activeIndex, setActiveIndex] = useState<number>(0);
   const [history, setHistory] = useState<DamMonitoringData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,14 +64,16 @@ export default function DamDashboard() {
 
   useEffect(() => {
     setConfigured(isSupabaseConfigured());
-    // Parse the initial sample text
     try {
-      setPreviewData(parseDamReport(SAMPLE_TEXT));
+      const parsedList = parseDamReports(SAMPLE_TEXT);
+      setParsedReports(parsedList);
     } catch {
       // ignore
     }
     fetchReports();
   }, []);
+
+  const previewData = parsedReports[activeIndex] || null;
 
   const fetchReports = async () => {
     setIsLoading(true);
@@ -114,16 +117,20 @@ export default function DamDashboard() {
       return;
     }
     try {
-      const parsed = parseDamReport(inputText);
-      setPreviewData(parsed);
-      setMessage({ text: "Teks berhasil diproses dan diekstraksi!", type: "success" });
+      const list = parseDamReports(inputText);
+      setParsedReports(list);
+      setActiveIndex(0);
+      setMessage({
+        text: `Berhasil mengolah & mengekstrak ${list.length} sesi laporan!`,
+        type: "success",
+      });
     } catch {
       setMessage({ text: "Gagal memproses teks. Pastikan format teks sesuai.", type: "error" });
     }
   };
 
   const handleSaveToSupabase = async () => {
-    if (!previewData) {
+    if (parsedReports.length === 0) {
       setMessage({ text: "Proses teks terlebih dahulu sebelum menyimpan.", type: "error" });
       return;
     }
@@ -133,7 +140,7 @@ export default function DamDashboard() {
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(previewData),
+        body: JSON.stringify(parsedReports),
       });
       const json = await res.json();
 
@@ -141,7 +148,10 @@ export default function DamDashboard() {
         throw new Error(json.error || "Gagal menyimpan");
       }
 
-      setMessage({ text: "Berhasil menyimpan laporan ke database Supabase via Prisma!", type: "success" });
+      setMessage({
+        text: `Berhasil menyimpan ${parsedReports.length} laporan ke database Supabase via Prisma!`,
+        type: "success",
+      });
       fetchReports();
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan";
@@ -263,6 +273,28 @@ export default function DamDashboard() {
 
           {/* Right Column: Parsed Display / Live Preview */}
           <div className="lg:col-span-7 flex flex-col gap-6">
+            {parsedReports.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider mr-1">
+                  Sesi Laporan:
+                </span>
+                {parsedReports.map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveIndex(idx)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1.5 whitespace-nowrap ${
+                      activeIndex === idx
+                        ? "bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30"
+                        : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                    }`}
+                  >
+                    <Clock className="w-3 h-3" />
+                    <span>{item.time_range || `Sesi ${idx + 1}`}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {previewData ? (
               <div className="space-y-6">
                 {/* Status Cards */}
