@@ -1,0 +1,32 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model DamReport {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now()) @map("created_at")
+  damName        String   @map("dam_name")
+  dateStr        String?  @map("date_str")
+  timeRange      String?  @map("time_range")
+  condition      String?
+  qInflowDkd     Decimal? @map("q_inflow_dkd")
+  qOutflowDkd    Decimal? @map("q_outflow_dkd")
+  mricanKiri     Decimal? @map("mrican_kiri")
+  mricanKanan    Decimal? @map("mrican_kanan")
+  siagaStatus    String?  @map("siaga_status")
+  outflowHourly  Json     @default("[]") @map("outflow_hourly")
+  outAverage     Decimal? @map("out_average")
+  elvAktual      Decimal? @map("elv_aktual")
+  cuaca          String?
+  shiftInfo      String?  @map("shift_info")
+  officers       Json     @default("[]")
+  rawText        String?  @map("raw_text")
+
+  @@map("dam_reports")
+}
