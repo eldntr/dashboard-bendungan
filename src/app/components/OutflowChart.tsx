@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { TrendingUp, Activity, Filter } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import CalendarRangePicker from "./CalendarRangePicker";
+import ClockRangePicker from "./ClockRangePicker";
+import { isSameDay } from "@/lib/dateUtils";
 
 export interface OutflowPoint {
   hour: string;
@@ -19,13 +22,17 @@ interface OutflowChartProps {
   availableDams?: string[];
   selectedDam?: string;
   onSelectDam?: (dam: string) => void;
+  showDamFilter?: boolean;
   availableDates?: string[];
-  selectedDate?: string;
-  onSelectDate?: (date: string) => void;
+  // Date Range Props
+  startDate?: Date | null;
+  endDate?: Date | null;
+  isAllDates?: boolean;
+  onDateRangeChange?: (start: Date | null, end: Date | null, isAll: boolean) => void;
+  // Time Range Props
   startHour?: string;
-  onSelectStartHour?: (hour: string) => void;
   endHour?: string;
-  onSelectEndHour?: (hour: string) => void;
+  onTimeRangeChange?: (start: string, end: string) => void;
   onResetFilter?: () => void;
   defaultDateLabel?: string;
 }
@@ -39,13 +46,15 @@ export default function OutflowChart({
   availableDams = [],
   selectedDam = "ALL",
   onSelectDam,
+  showDamFilter = false,
   availableDates = [],
-  selectedDate = "TODAY",
-  onSelectDate,
+  startDate,
+  endDate,
+  isAllDates = false,
+  onDateRangeChange,
   startHour = "00.00",
-  onSelectStartHour,
-  endHour = "23.00",
-  onSelectEndHour,
+  endHour = "23.59",
+  onTimeRangeChange,
   onResetFilter,
   defaultDateLabel = "Hari Ini",
 }: OutflowChartProps) {
@@ -78,7 +87,6 @@ export default function OutflowChart({
   const chartH = height - padTop - padBottom;
 
   const values = outflowHourly.map((d) => d.value);
-  const minVal = values.length > 0 ? Math.min(...values) : 0;
   const maxVal = values.length > 0 ? Math.max(...values) : 0;
 
   /**
@@ -179,16 +187,16 @@ export default function OutflowChart({
           </div>
         </div>
 
-        {/* Integrated Filter Bar: Bendungan, Hari & Jam (WIB 24 Jam Dropdown) */}
+        {/* Integrated Filter Bar: Bendungan, Kalender Rentang Tanggal & Jam Clock Picker */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-          {/* Filter Bendungan (Multi-Bendung) */}
-          {availableDams.length > 0 && (
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs">
-              <span className="text-slate-400 text-[10px] font-medium uppercase">Bendung:</span>
+          {/* Filter Bendungan (Multi-Bendung) - Hanya jika diaktifkan via props */}
+          {showDamFilter && availableDams.length > 0 && (
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs shadow-2xs">
+              <span className="text-slate-400 text-[10px] font-semibold uppercase">Bendung:</span>
               <select
                 value={selectedDam}
                 onChange={(e) => onSelectDam?.(e.target.value)}
-                className="bg-transparent text-slate-700 font-medium text-xs focus:outline-none cursor-pointer max-w-[140px] truncate"
+                className="bg-transparent text-slate-700 font-semibold text-xs focus:outline-none cursor-pointer max-w-[140px] truncate"
               >
                 <option value="ALL">Semua Bendungan</option>
                 {availableDams.map((dam) => (
@@ -200,70 +208,35 @@ export default function OutflowChart({
             </div>
           )}
 
-          {/* Filter Hari */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs">
-            <span className="text-slate-400 text-[10px] font-medium uppercase">Hari:</span>
-            <select
-              value={selectedDate}
-              onChange={(e) => onSelectDate?.(e.target.value)}
-              className="bg-transparent text-slate-700 font-medium text-xs focus:outline-none cursor-pointer"
-            >
-              <option value="TODAY">Hari Ini ({defaultDateLabel})</option>
-              <option value="ALL">Semua Hari</option>
-              {availableDates.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Kalender Filter Rentang Tanggal */}
+          <CalendarRangePicker
+            startDate={startDate ?? null}
+            endDate={endDate ?? null}
+            isAllDates={isAllDates}
+            availableDateStrings={availableDates}
+            onChange={(start, end, all) => {
+              onDateRangeChange?.(start, end, all);
+            }}
+            defaultDateLabel={defaultDateLabel}
+          />
 
-          {/* Filter Jam Mulai (WIB) */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs">
-            <span className="text-slate-400 text-[10px] font-medium uppercase">Dari:</span>
-            <select
-              value={startHour}
-              onChange={(e) => onSelectStartHour?.(e.target.value)}
-              className="bg-transparent text-slate-700 font-mono font-medium text-xs focus:outline-none cursor-pointer"
-            >
-              {Array.from({ length: 24 }, (_, i) => {
-                const val = `${i.toString().padStart(2, "0")}.00`;
-                return (
-                  <option key={val} value={val}>
-                    {val} WIB
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {/* Filter Jam Selesai (WIB) */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs">
-            <span className="text-slate-400 text-[10px] font-medium uppercase">Sampai:</span>
-            <select
-              value={endHour}
-              onChange={(e) => onSelectEndHour?.(e.target.value)}
-              className="bg-transparent text-slate-700 font-mono font-medium text-xs focus:outline-none cursor-pointer"
-            >
-              {Array.from({ length: 24 }, (_, i) => {
-                const val = `${i.toString().padStart(2, "0")}.00`;
-                return (
-                  <option key={val} value={val}>
-                    {val} WIB
-                  </option>
-                );
-              })}
-              <option value="23.59">23.59 WIB</option>
-            </select>
-          </div>
+          {/* Clock Filter Rentang Jam */}
+          <ClockRangePicker
+            startHour={startHour}
+            endHour={endHour}
+            onChange={(start, end) => {
+              onTimeRangeChange?.(start, end);
+            }}
+          />
 
           {/* Tombol Reset jika filter aktif */}
-          {(selectedDam !== "ALL" || selectedDate !== "TODAY" || startHour !== "00.00" || (endHour !== "23.59" && endHour !== "23.00")) && (
+          {(selectedDam !== "ALL" || isAllDates || (startDate && !isSameDay(startDate, new Date())) || startHour !== "00.00" || (endHour !== "23.59" && endHour !== "23.00")) && (
             <button
               onClick={() => onResetFilter?.()}
-              className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold px-1 py-0.5 underline transition"
-              title="Kembalikan ke filter awal"
+              className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-blue-600 font-semibold px-2 py-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              title="Kembalikan semua filter ke kondisi awal"
             >
+              <RotateCcw className="w-3 h-3" />
               Reset
             </button>
           )}

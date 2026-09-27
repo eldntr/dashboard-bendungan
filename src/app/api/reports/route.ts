@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { isValidAdminToken } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -15,6 +17,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("admin_session")?.value;
+    if (!isValidAdminToken(token)) {
+      return NextResponse.json(
+        { success: false, error: "Akses ditolak. Silakan login admin terlebih dahulu." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
     // Check if bulk array
@@ -75,6 +86,15 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("admin_session")?.value;
+    if (!isValidAdminToken(token)) {
+      return NextResponse.json(
+        { success: false, error: "Akses ditolak. Silakan login admin terlebih dahulu." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) {
