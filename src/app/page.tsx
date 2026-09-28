@@ -14,6 +14,7 @@ import {
   FileText,
 } from "lucide-react";
 import OutflowChart, { OutflowPoint } from "@/app/components/OutflowChart";
+import Footer from "@/app/components/Footer";
 import {
   parseDateString,
   formatDate,
@@ -183,7 +184,7 @@ export default function DamDashboard() {
     }
   }, [combinedReports]);
 
-  // Daftar unik bendungan yang ada di data
+  // Daftar unik bendung yang ada di data
   const availableDams = Array.from(
     new Set(
       combinedReports
@@ -192,7 +193,7 @@ export default function DamDashboard() {
     )
   );
 
-  // Daftar bendungan yang akan ditampilkan di dashboard
+  // Daftar bendung yang akan ditampilkan di dashboard
   const damsToDisplay = selectedDam === "ALL"
     ? availableDams
     : availableDams.includes(selectedDam)
@@ -262,10 +263,10 @@ export default function DamDashboard() {
     }
   }
 
-  // Filter titik data berdasarkan bendungan, rentang tanggal kalender dan rentang jam
+  // Filter titik data berdasarkan bendung, rentang tanggal kalender dan rentang jam
   const filteredOutflowPoints = allOutflowPoints
     .filter((pt) => {
-      // Filter Bendungan
+      // Filter Bendung
       if (selectedDam !== "ALL" && pt.damName && pt.damName !== selectedDam) {
         return false;
       }
@@ -305,7 +306,7 @@ export default function DamDashboard() {
               </div>
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-                  Dashboard Monitoring Bendungan
+                  Dashboard Monitoring Bendung
                 </h1>
               </div>
             </div>
@@ -351,10 +352,10 @@ export default function DamDashboard() {
               </div>
               <div>
                 <span className="text-[11px] font-bold tracking-wider uppercase text-slate-400 block">
-                  PILIHAN BENDUNGAN
+                  PILIHAN BENDUNG
                 </span>
                 <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                  {selectedDam === "ALL" ? "Semua Bendungan" : selectedDam}
+                  {selectedDam === "ALL" ? "Semua Bendung" : selectedDam}
                 </h2>
               </div>
             </div>
@@ -369,7 +370,7 @@ export default function DamDashboard() {
                 onChange={(e) => setSelectedDam(e.target.value)}
                 className="w-full sm:w-auto min-w-[200px] bg-slate-50 border border-slate-200 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl py-2 px-3 text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer transition shadow-2xs"
               >
-                <option value="ALL">Semua Bendungan</option>
+                <option value="ALL">Semua Bendung</option>
                 {availableDams.map((dam) => (
                   <option key={dam} value={dam}>
                     {dam}
@@ -384,7 +385,7 @@ export default function DamDashboard() {
             <div className="flex-grow border-t border-slate-200"></div>
             <span className="flex-shrink mx-4 text-xs font-semibold uppercase tracking-wider text-slate-400 bg-slate-50/50 px-2 rounded">
               {selectedDam === "ALL"
-                ? `Daftar Monitoring Seluruh Bendungan (${availableDams.length} Lokasi)`
+                ? `Daftar Monitoring Seluruh Bendung (${availableDams.length} Lokasi)`
                 : `Dashboard ${selectedDam}`}
             </span>
             <div className="flex-grow border-t border-slate-200"></div>
@@ -405,7 +406,7 @@ export default function DamDashboard() {
                     aria-label={`Monitoring ${damName}`}
                     className="bg-white border border-slate-200 rounded-3xl p-5 md:p-7 shadow-xs space-y-6"
                   >
-                    {/* Header Kartu Bendungan */}
+                    {/* Header Kartu Bendung */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
                       <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
@@ -414,7 +415,7 @@ export default function DamDashboard() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                              {selectedDam === "ALL" ? `Bendungan #${damIdx + 1}` : "Monitoring Utama"}
+                              {selectedDam === "ALL" ? `Bendung #${damIdx + 1}` : "Monitoring Utama"}
                             </span>
                             <span
                               className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
@@ -578,7 +579,7 @@ export default function DamDashboard() {
                 Belum Ada Data Laporan
               </h3>
               <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-                Grafik dan ringkasan debit akan otomatis ditampilkan setelah Anda memasukkan teks laporan bendungan di Halaman Admin.
+                Grafik dan ringkasan debit akan otomatis ditampilkan setelah Anda memasukkan teks laporan bendung di Halaman Admin.
               </p>
               <Link
                 href="/admin"
@@ -590,6 +591,9 @@ export default function DamDashboard() {
             </div>
           )}
         </div>
+
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );

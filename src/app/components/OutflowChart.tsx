@@ -187,9 +187,9 @@ export default function OutflowChart({
           </div>
         </div>
 
-        {/* Integrated Filter Bar: Bendungan, Kalender Rentang Tanggal & Jam Clock Picker */}
+        {/* Integrated Filter Bar: Bendung, Kalender Rentang Tanggal & Jam Clock Picker */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-          {/* Filter Bendungan (Multi-Bendung) - Hanya jika diaktifkan via props */}
+          {/* Filter Bendung (Multi-Bendung) - Hanya jika diaktifkan via props */}
           {showDamFilter && availableDams.length > 0 && (
             <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs shadow-2xs">
               <span className="text-slate-400 text-[10px] font-semibold uppercase">Bendung:</span>
@@ -198,7 +198,7 @@ export default function OutflowChart({
                 onChange={(e) => onSelectDam?.(e.target.value)}
                 className="bg-transparent text-slate-700 font-semibold text-xs focus:outline-none cursor-pointer max-w-[140px] truncate"
               >
-                <option value="ALL">Semua Bendungan</option>
+                <option value="ALL">Semua Bendung</option>
                 {availableDams.map((dam) => (
                   <option key={dam} value={dam}>
                     {dam}
@@ -460,7 +460,7 @@ export default function OutflowChart({
                 textAnchor="middle"
                 className="fill-slate-400 text-[10px] select-none"
               >
-                Coba pilih &quot;Semua Hari&quot; atau sesuaikan filter jam/bendungan
+                Coba pilih &quot;Semua Hari&quot; atau sesuaikan filter jam/bendung
               </text>
             </g>
           )}

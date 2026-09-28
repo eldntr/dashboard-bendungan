@@ -23,6 +23,7 @@ import {
   LogOut,
   KeyRound,
 } from "lucide-react";
+import Footer from "@/app/components/Footer";
 
 interface ApiDamReport {
   id: string;
@@ -220,7 +221,7 @@ export default function AdminPage() {
     }
 
     if (!parsedList || parsedList.length === 0) {
-      setMessage({ text: "Tidak ada data laporan bendungan yang terbaca dari teks input.", type: "error" });
+      setMessage({ text: "Tidak ada data laporan bendung yang terbaca dari teks input.", type: "error" });
       return;
     }
 
@@ -291,10 +292,10 @@ export default function AdminPage() {
                 <Lock className="w-7 h-7 text-white" />
               </div>
               <h1 className="text-xl font-bold tracking-tight text-white">
-                Akses Admin Bendungan
+                Akses Admin Bendung
               </h1>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Silakan masukkan kata sandi administrator untuk mengelola input teks dan data laporan bendungan.
+                Silakan masukkan kata sandi administrator untuk mengelola input teks dan data laporan bendung.
               </p>
             </div>
 
@@ -359,6 +360,18 @@ export default function AdminPage() {
               </Link>
             </div>
           </div>
+
+          <div className="text-center text-xs text-slate-500">
+            Powered by{" "}
+            <a
+              href="https://wa.me/6281361858108?text=i%20want%20to%20build%20something%20cool"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-slate-300 hover:text-white transition underline underline-offset-2 decoration-slate-600 hover:decoration-white"
+            >
+              Apexia
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -395,7 +408,7 @@ export default function AdminPage() {
               Admin & Manajemen Laporan
             </h1>
             <p className="text-slate-500 text-xs md:text-sm">
-              Kelola input teks laporan bendungan harian dan kontrol data yang tersimpan di sistem.
+              Kelola input teks laporan bendung harian dan kontrol data yang tersimpan di sistem.
             </p>
           </div>
 
@@ -448,7 +461,7 @@ export default function AdminPage() {
                   Input & Ekstraksi Teks Laporan
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Tempel teks laporan harian/shift bendungan untuk diekstrak dan disimpan otomatis.
+                  Tempel teks laporan harian/shift bendung untuk diekstrak dan disimpan otomatis.
                 </p>
               </div>
             </div>
@@ -465,7 +478,7 @@ export default function AdminPage() {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             rows={14}
-            placeholder="Tempel teks laporan bendungan di sini..."
+            placeholder="Tempel teks laporan bendung di sini..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs md:text-sm font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition resize-none leading-relaxed"
           />
 
@@ -580,6 +593,9 @@ export default function AdminPage() {
             </div>
           )}
         </section>
+
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );
