@@ -12,6 +12,7 @@ import {
   BarChart3,
   LayoutDashboard,
   FileText,
+  Ruler,
 } from "lucide-react";
 import OutflowChart, { OutflowPoint } from "@/app/components/OutflowChart";
 import Footer from "@/app/components/Footer";
@@ -445,19 +446,19 @@ export default function DamDashboard() {
                       </div>
                     </div>
 
-                    {/* Status Cards (Kondisi, Siaga Banjir, Cuaca) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Status Cards (Kondisi, Siaga Banjir, Elv Aktual, Cuaca) */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-slate-50/70 border border-slate-200/80 p-4 rounded-xl shadow-2xs">
                         <span className="text-xs text-slate-400">Kondisi</span>
                         <p className="text-lg font-bold text-emerald-600 mt-1 flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4" />
-                          {damData.condition || "Normal"}
+                          <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{damData.condition || "Normal"}</span>
                         </p>
                       </div>
                       <div className="bg-slate-50/70 border border-slate-200/80 p-4 rounded-xl shadow-2xs">
                         <span className="text-xs text-slate-400">Siaga Banjir</span>
                         <p
-                          className={`text-lg font-bold mt-1 ${
+                          className={`text-lg font-bold mt-1 truncate ${
                             damData.siaga_status === "Merah"
                               ? "text-rose-600"
                               : damData.siaga_status === "Kuning"
@@ -471,10 +472,24 @@ export default function DamDashboard() {
                         </p>
                       </div>
                       <div className="bg-slate-50/70 border border-slate-200/80 p-4 rounded-xl shadow-2xs">
+                        <span className="text-xs text-slate-400">Elv Aktual</span>
+                        <p className="text-lg font-bold text-sky-600 mt-1 flex items-center gap-1.5">
+                          <Ruler className="w-4 h-4 flex-shrink-0" />
+                          {damData.elv_aktual !== null && damData.elv_aktual !== undefined ? (
+                            <span>
+                              {formatFlowRate(damData.elv_aktual)}{" "}
+                              <span className="text-xs font-normal text-slate-500">m</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50/70 border border-slate-200/80 p-4 rounded-xl shadow-2xs">
                         <span className="text-xs text-slate-400">Cuaca</span>
                         <p className="text-lg font-bold text-amber-600 mt-1 flex items-center gap-1.5">
-                          <CloudSun className="w-4 h-4" />
-                          {damData.cuaca || "Cerah"}
+                          <CloudSun className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{damData.cuaca || "Cerah"}</span>
                         </p>
                       </div>
                     </div>
