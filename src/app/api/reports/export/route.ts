@@ -1,21 +1,90 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
+import { parseDateString } from "@/lib/dateUtils";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const dam = searchParams.get("dam");
+    const range = searchParams.get("range") || "all";
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
 
-    // Filter per bendung jika ada parameter dam
-    const where = dam && dam !== "ALL" ? { damName: dam } : {};
+    // Filter per bendung
+    const where: Record<string, unknown> = {};
+    if (dam && dam !== "ALL") {
+      where.damName = dam;
+    }
 
     const reports = await prisma.damReport.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
 
-    const rows = reports.map((r, index) => {
+    // Helper tanggal
+    const getReportDate = (r: (typeof reports)[number]): Date | null => {
+      if (r.dateStr) {
+        const d = parseDateString(r.dateStr);
+        if (d) return d;
+      }
+      if (r.createdAt) {
+        const d = new Date(r.createdAt);
+        if (!isNaN(d.getTime())) {
+          d.setHours(0, 0, 0, 0);
+          return d;
+        }
+      }
+      return null;
+    };
+
+    // Filter Periode
+    let filteredReports = reports;
+    if (range !== "all") {
+      let maxReportDate = new Date();
+      reports.forEach((r) => {
+        const d = getReportDate(r);
+        if (d && d > maxReportDate) {
+          maxReportDate = new Date(d);
+        }
+      });
+
+      const refEnd = new Date(maxReportDate);
+      refEnd.setHours(23, 59, 59, 999);
+
+      if (range === "week") {
+        const weekStart = new Date(refEnd);
+        weekStart.setDate(weekStart.getDate() - 7);
+        weekStart.setHours(0, 0, 0, 0);
+        filteredReports = reports.filter((r) => {
+          const d = getReportDate(r);
+          return !d || (d >= weekStart && d <= refEnd);
+        });
+      } else if (range === "month") {
+        const monthStart = new Date(refEnd);
+        monthStart.setDate(monthStart.getDate() - 30);
+        monthStart.setHours(0, 0, 0, 0);
+        filteredReports = reports.filter((r) => {
+          const d = getReportDate(r);
+          return !d || (d >= monthStart && d <= refEnd);
+        });
+      } else if (range === "custom") {
+        const customStart = startDateParam ? parseDateString(startDateParam) : null;
+        if (customStart) customStart.setHours(0, 0, 0, 0);
+        const customEnd = endDateParam ? parseDateString(endDateParam) : null;
+        if (customEnd) customEnd.setHours(23, 59, 59, 999);
+
+        filteredReports = reports.filter((r) => {
+          const d = getReportDate(r);
+          if (!d) return true;
+          if (customStart && d < customStart) return false;
+          if (customEnd && d > customEnd) return false;
+          return true;
+        });
+      }
+    }
+
+    const rows = filteredReports.map((r, index) => {
       const outflowHourly = Array.isArray(r.outflowHourly)
         ? (r.outflowHourly as { hour: string; value: number }[])
         : [];
@@ -82,11 +151,11 @@ export async function GET(request: Request) {
 
     // Buat workbook satu sheet
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Monitoring Bendungan");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Monitoring Bendung");
 
     const buf = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     const todayStr = new Date().toISOString().slice(0, 10);
-    const filename = `Laporan_Bendungan_${todayStr}.xlsx`;
+    const filename = `Laporan_Bendung_${todayStr}.xlsx`;
 
     return new NextResponse(buf, {
       status: 200,

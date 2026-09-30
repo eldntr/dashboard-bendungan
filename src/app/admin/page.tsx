@@ -25,7 +25,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import Footer from "@/app/components/Footer";
-import { exportDamReportsToExcel } from "@/lib/exportExcel";
+import ExportModal from "@/app/components/ExportModal";
 
 interface ApiDamReport {
   id: string;
@@ -95,6 +95,7 @@ export default function AdminPage() {
   const [history, setHistory] = useState<DamMonitoringData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
   const [configured, setConfigured] = useState<boolean>(() => {
     return Boolean(
@@ -512,15 +513,11 @@ export default function AdminPage() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() =>
-                  exportDamReportsToExcel(history, {
-                    filename: "Laporan_Bendungan_Admin",
-                    sheetName: "Data Bendung",
-                  })
-                }
+                type="button"
+                onClick={() => setIsExportModalOpen(true)}
                 disabled={history.length === 0}
                 className="px-3 py-1.5 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg flex items-center gap-1.5 transition shadow-2xs font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Unduh seluruh laporan tersimpan dalam format Excel (.xlsx)"
+                title="Unduh data laporan bendung dalam format Excel (.xlsx)"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Unduh Excel</span>
@@ -612,6 +609,14 @@ export default function AdminPage() {
             </div>
           )}
         </section>
+
+        {/* Modal Ekspor Data Bendung */}
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          reports={history}
+          availableDams={Array.from(new Set(history.map((r) => r.dam_name).filter(Boolean)))}
+        />
 
         {/* Footer */}
         <Footer />
