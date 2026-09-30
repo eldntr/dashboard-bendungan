@@ -13,9 +13,13 @@ import {
   LayoutDashboard,
   FileText,
   Ruler,
+  FileSpreadsheet,
+  Download,
+  ChevronDown,
 } from "lucide-react";
 import OutflowChart, { OutflowPoint } from "@/app/components/OutflowChart";
 import Footer from "@/app/components/Footer";
+import { exportDamReportsToExcel } from "@/lib/exportExcel";
 import {
   parseDateString,
   formatDate,
@@ -84,6 +88,19 @@ export default function DamDashboard() {
   const [isAllDates, setIsAllDates] = useState<boolean>(false);
   const [startHour, setStartHour] = useState<string>("00.00");
   const [endHour, setEndHour] = useState<string>("23.59");
+  const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Tutup dropdown export saat klik di luar
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const mapReports = (data: ApiDamReport[]): DamMonitoringData[] => {
     return data.map((item) => ({
@@ -314,6 +331,77 @@ export default function DamDashboard() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Tombol Ekspor Excel untuk seluruh pengunjung/user */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={combinedReports.length === 0}
+                title="Unduh data laporan dalam format Excel (.xlsx)"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 hover:border-emerald-300 shadow-2xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Unduh Excel</span>
+                <ChevronDown className="w-3 h-3 text-emerald-600" />
+              </button>
+
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in slide-in-from-top-1">
+                  <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1">
+                    <p className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                      Format Excel (1 Sheet)
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Unduh riwayat data pemantauan bendung
+                    </p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowExportMenu(false);
+                      exportDamReportsToExcel(combinedReports, {
+                        filename: "Seluruh_Laporan_Bendungan",
+                        sheetName: "Semua Bendung",
+                      });
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center justify-between transition cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Download className="w-3.5 h-3.5 text-emerald-600" />
+                      Unduh Seluruh Data
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 font-semibold text-slate-600">
+                      {combinedReports.length}
+                    </span>
+                  </button>
+
+                  {selectedDam !== "ALL" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowExportMenu(false);
+                        const filtered = combinedReports.filter((r) => r.dam_name === selectedDam);
+                        exportDamReportsToExcel(filtered, {
+                          filename: `Laporan_${selectedDam.replace(/\s+/g, "_")}`,
+                          sheetName: selectedDam.slice(0, 31),
+                        });
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center justify-between transition cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Download className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="truncate">Hanya {selectedDam}</span>
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 font-semibold text-slate-600">
+                        {combinedReports.filter((r) => r.dam_name === selectedDam).length}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={fetchReports}
               disabled={isMounted ? isLoading : false}
