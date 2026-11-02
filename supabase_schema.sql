@@ -27,17 +27,34 @@ CREATE INDEX IF NOT EXISTS idx_dam_reports_created_at ON dam_reports (created_at
 ALTER TABLE dam_reports ENABLE ROW LEVEL SECURITY;
 
 -- Buat policy agar publik bisa membaca (SELECT) dan menulis (INSERT) data (anon key)
+DROP POLICY IF EXISTS "Allow public read access" ON dam_reports;
 CREATE POLICY "Allow public read access" 
 ON dam_reports FOR SELECT 
 TO anon, authenticated 
 USING (true);
 
+DROP POLICY IF EXISTS "Allow public insert access" ON dam_reports;
 CREATE POLICY "Allow public insert access" 
 ON dam_reports FOR INSERT 
 TO anon, authenticated 
 WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public delete access" ON dam_reports;
 CREATE POLICY "Allow public delete access" 
 ON dam_reports FOR DELETE 
 TO anon, authenticated 
 USING (true);
+
+-- Aktifkan Realtime Replication untuk dam_reports agar dashboard menerima update instan via WebSocket
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+      AND schemaname = 'public' 
+      AND tablename = 'dam_reports'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE dam_reports;
+  END IF;
+END $$;
+

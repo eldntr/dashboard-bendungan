@@ -14,12 +14,13 @@ import {
   FileText,
   Ruler,
   FileSpreadsheet,
-  Download,
-  ChevronDown,
+  Zap,
 } from "lucide-react";
 import OutflowChart, { OutflowPoint } from "@/app/components/OutflowChart";
 import Footer from "@/app/components/Footer";
 import ExportModal from "@/app/components/ExportModal";
+import AwlrJatimlerekPanel from "@/app/components/AwlrJatimlerekPanel";
+import { supabase } from "@/lib/supabase";
 import {
   parseDateString,
   formatDate,
@@ -51,7 +52,12 @@ interface ApiDamReport {
 export default function DamDashboard() {
   const [history, setHistory] = useState<DamMonitoringData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [showRealtimePing, setShowRealtimePing] = useState(false);
+
   const hasAutoSelectedDateRef = useRef(false);
   const [configured, setConfigured] = useState<boolean>(() => {
     return Boolean(
@@ -68,6 +74,19 @@ export default function DamDashboard() {
         month: "long",
         year: "numeric",
       }).format(new Date());
+    } catch {
+      return "";
+    }
+  };
+
+  const formatTimeStr = (date: Date | null) => {
+    if (!date) return "-";
+    try {
+      return new Intl.DateTimeFormat("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }).format(date) + " WIB";
     } catch {
       return "";
     }
@@ -113,49 +132,83 @@ export default function DamDashboard() {
     }));
   };
 
-  const fetchReports = useCallback(async () => {
-    setIsLoading(true);
+  const fetchReports = useCallback(async (isSilent = false) => {
+    if (isSilent) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const res = await fetch("/api/reports");
       const json = await res.json();
       if (json.success && json.data) {
         setConfigured(true);
         setHistory(mapReports(json.data));
+        setLastUpdated(new Date());
       }
     } catch (err) {
       console.error("Error fetching reports:", err);
     } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function loadInitial() {
-      try {
-        const res = await fetch("/api/reports");
-        const json = await res.json();
-        if (isMounted && json.success && json.data) {
-          setConfigured(true);
-          setHistory(mapReports(json.data));
-        }
-      } catch (err) {
-        console.error("Initial load error:", err);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+      if (isSilent) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
       }
     }
-    loadInitial();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
+  // Muat data awal saat komponen dimuat
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    fetchReports(false);
+  }, [fetchReports]);
+
+  // Sinkronisasi data saat user kembali membuka tab browser (misal setelah tab diminimalkan lama)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchReports(true);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchReports]);
+
+  // Supabase Realtime (Opsi B): Menerima notifikasi perubahan data secara instan (< 1 detik) tanpa polling
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+
+    const channel = client
+      .channel("dam_reports_realtime_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "dam_reports",
+        },
+        () => {
+          fetchReports(true);
+          setShowRealtimePing(true);
+          setTimeout(() => setShowRealtimePing(false), 3500);
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          setIsRealtimeConnected(true);
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
+          setIsRealtimeConnected(false);
+        }
+      });
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  }, [fetchReports]);
 
   // Data sumber laporan
   const combinedReports = history;
@@ -301,73 +354,120 @@ export default function DamDashboard() {
     .sort((a, b) => parseHourToMinutes(a.hour) - parseHourToMinutes(b.hour));
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-200 gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200/80 shadow-xs">
-                <Waves className="w-8 h-8" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-3 sm:p-5 lg:p-6 font-sans">
+      <div className="w-full max-w-[1920px] mx-auto space-y-6">
+        {/* =========================================================
+            GRID SPLIT KANAN KIRI: MONITORING BENDUNG & TELEMETRI AWLR
+           ========================================================= */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          {/* =========================================================
+              KOLOM KIRI: MONITORING BENDUNGAN
+             ========================================================= */}
+          <div className="space-y-6 flex flex-col">
+            {/* Header Sisi Kiri: Monitoring Bendungan */}
+            <header className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-200/80 shadow-xs">
+                  <Waves className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-blue-600 block">
+                    SISTEM MONITORING BENDUNG
+                  </span>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                    Monitoring Bendungan
+                  </h1>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-                  Dashboard Monitoring Bendung
-                </h1>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Banner Notifikasi Realtime Melayang */}
+                {showRealtimePing && (
+                  <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-2.5 bg-emerald-600 text-white text-xs font-semibold rounded-2xl shadow-xl shadow-emerald-900/20 border border-emerald-400 animate-bounce">
+                    <Zap className="w-4 h-4 text-emerald-200 animate-pulse" />
+                    <span>Data bendung baru terdeteksi & diperbarui secara Real-time!</span>
+                  </div>
+                )}
+
+                {/* Tombol Ekspor Excel */}
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(true)}
+                  disabled={combinedReports.length === 0}
+                  suppressHydrationWarning
+                  title="Unduh data laporan bendung dalam format Excel (.xlsx)"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 hover:border-emerald-300 shadow-2xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Unduh Excel</span>
+                </button>
+
+                {/* Tombol Segarkan Manual */}
+                <button
+                  type="button"
+                  onClick={() => fetchReports(false)}
+                  disabled={isLoading || isRefreshing}
+                  suppressHydrationWarning
+                  title="Segarkan data monitoring sekarang"
+                  aria-label="Segarkan data monitoring sekarang"
+                  className="p-2 rounded-xl text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 transition shadow-2xs flex items-center justify-center cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${
+                      (isLoading || isRefreshing)
+                        ? "animate-spin text-blue-600"
+                        : ""
+                    }`}
+                  />
+                </button>
+
+                {/* Badge Status Live Realtime */}
+                <div
+                  suppressHydrationWarning
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition shadow-2xs ${
+                    isRealtimeConnected
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      : "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}
+                  title={
+                    isRealtimeConnected
+                      ? "Terhubung ke Supabase Realtime: data bendung otomatis diperbarui seketika begitu ada input baru"
+                      : "Menghubungkan ke Realtime..."
+                  }
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span
+                      className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                        isRealtimeConnected
+                          ? "animate-ping bg-emerald-400"
+                          : "bg-slate-400"
+                      }`}
+                    ></span>
+                    <span
+                      className={`relative inline-flex rounded-full h-2 w-2 ${
+                        isRealtimeConnected ? "bg-emerald-500" : "bg-slate-400"
+                      }`}
+                    ></span>
+                  </span>
+                  <span>{isRealtimeConnected ? "Live" : "Offline"}</span>
+                </div>
+
+                <Link
+                  href="/admin"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-2xs transition"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Admin</span>
+                </Link>
               </div>
-            </div>
-          </div>
+            </header>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Tombol Ekspor Excel untuk seluruh pengunjung/user */}
-            <button
-              type="button"
-              onClick={() => setIsExportModalOpen(true)}
-              disabled={combinedReports.length === 0}
-              title="Unduh data laporan bendung dalam format Excel (.xlsx)"
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 hover:border-emerald-300 shadow-2xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Unduh Excel</span>
-            </button>
-
-            <button
-              onClick={fetchReports}
-              disabled={isMounted ? isLoading : false}
-              title="Segarkan data monitoring"
-              aria-label="Segarkan data monitoring"
-              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 transition shadow-2xs flex items-center justify-center cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${isMounted && isLoading ? "animate-spin" : ""}`} />
-            </button>
-
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-2xs transition"
-            >
-              <FileText className="w-3.5 h-3.5 text-blue-600" />
-              <span>Admin / Input</span>
-            </Link>
-
-            <div className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-2 ${
-              configured 
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                : "bg-amber-50 text-amber-700 border-amber-200"
-            }`}>
-              <Database className="w-3.5 h-3.5" />
-              {configured ? "Connected" : "Local Demo Mode (Supabase not configured)"}
-            </div>
-          </div>
-        </header>
-
-        {/* Dashboard Visualisasi & Grafik */}
-        <div className="space-y-6">
-          {/* Pemilih Lokasi / Bendung Utama */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center flex-shrink-0">
-                <LayoutDashboard className="w-5 h-5" />
-              </div>
+            {/* Pemilih Lokasi / Bendung Utama */}
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                  <LayoutDashboard className="w-5 h-5" />
+                </div>
               <div>
                 <span className="text-[11px] font-bold tracking-wider uppercase text-slate-400 block">
                   PILIHAN BENDUNG
@@ -624,7 +724,15 @@ export default function DamDashboard() {
           )}
         </div>
 
-        {/* Modal Ekspor Data Bendung ke Excel */}
+        {/* =========================================================
+            KOLOM KANAN: TELEMETRI AWLR B. JATIMLEREK
+           ========================================================= */}
+        <div className="space-y-6 flex flex-col">
+          <AwlrJatimlerekPanel />
+        </div>
+      </div>
+
+      {/* Modal Ekspor Data Bendung ke Excel */}
         <ExportModal
           isOpen={isExportModalOpen}
           onClose={() => setIsExportModalOpen(false)}
